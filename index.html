@@ -42,16 +42,23 @@
             letter-spacing: 0.05em;
         }
 
-        nav a {
+        nav button {
+            background: transparent;
+            border: 1px solid var(--border-color);
             color: var(--text-muted);
-            text-decoration: none;
-            margin-left: 1.5rem;
-            font-size: 0.9rem;
-            transition: color 0.2s;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-left: 0.75rem;
+            font-size: 0.85rem;
+            width: auto;
+            margin-top: 0;
         }
 
-        nav a:hover {
-            color: var(--text-main);
+        nav button.active, nav button:hover {
+            background-color: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
         }
 
         main {
@@ -62,7 +69,7 @@
             padding: 2rem 1rem;
         }
 
-        .checkout-container {
+        .portal-container {
             background-color: var(--card-bg);
             padding: 2.5rem;
             border-radius: 12px;
@@ -125,7 +132,7 @@
             border-color: #38bdf8;
         }
 
-        button {
+        button.action-btn {
             width: 100%;
             padding: 0.85rem;
             border: none;
@@ -137,12 +144,12 @@
             margin-top: 0.5rem;
         }
 
-        .btn-pay {
+        .btn-pay, .btn-create {
             background-color: var(--primary);
             color: #ffffff;
         }
 
-        .btn-pay:hover {
+        .btn-pay:hover, .btn-create:hover {
             background-color: var(--primary-dark);
         }
 
@@ -157,11 +164,15 @@
             background-color: #7f1d1d22;
         }
 
-        #status-message {
+        #status-message, #link-output {
             margin-top: 1rem;
             text-align: center;
             font-size: 0.9rem;
-            font-weight: 500;
+            word-break: break-all;
+        }
+
+        .hidden {
+            display: none;
         }
 
         footer {
@@ -179,19 +190,36 @@
     <header>
         <div class="logo">Amanapay</div>
         <nav>
-            <a href="#">Dashboard</a>
-            <a href="#">Transactions</a>
-            <a href="#">Support</a>
+            <button id="nav-vendor" onclick="switchView('vendor')">Vendor Portal</button>
+            <button id="nav-buyer" class="active" onclick="switchView('buyer')">Buyer Checkout</button>
         </nav>
     </header>
 
     <main>
-        <div class="checkout-container">
+        <!-- PORTAL 1: VENDOR LINK CREATOR -->
+        <div id="vendor-portal" class="portal-container hidden">
+            <h2>Create Escrow Link</h2>
+            <form id="vendor-form">
+                <div class="form-group">
+                    <label for="item-name">Item / Service Name</label>
+                    <input type="text" id="item-name" placeholder="e.g., Oversized Vintage Hoodie" required>
+                </div>
+                <div class="form-group">
+                    <label for="item-amount">Amount (KES)</label>
+                    <input type="number" id="item-amount" placeholder="2537.50" required>
+                </div>
+                <button type="submit" class="action-btn btn-create">Generate Checkout Link</button>
+            </form>
+            <div id="link-output"></div>
+        </div>
+
+        <!-- PORTAL 2: BUYER CHECKOUT & DISPUTE -->
+        <div id="buyer-portal" class="portal-container">
             <h2>Secure Escrow Checkout</h2>
             
             <div class="product-summary">
-                <p><span>Item:</span> <strong>Oversized Vintage Hoodie</strong></p>
-                <p><span>Amount:</span> <strong>KES 2,537.50</strong></p>
+                <p><span>Item:</span> <strong id="display-item">Oversized Vintage Hoodie</strong></p>
+                <p><span>Amount:</span> <strong id="display-amount">KES 2,537.50</strong></p>
                 <p><span>Escrow Status:</span> <strong style="color: #38bdf8;">Protected</strong></p>
             </div>
 
@@ -201,8 +229,8 @@
                     <input type="text" id="phone" value="254795209859" placeholder="2547XXXXXXXX" required>
                 </div>
 
-                <button type="submit" class="btn-pay" id="pay-btn">Pay with M-Pesa STK Push</button>
-                <button type="button" class="btn-dispute" onclick="handleRaiseDispute()">Raise a Dispute Instead</button>
+                <button type="submit" class="action-btn btn-pay" id="pay-btn">Pay with M-Pesa STK Push</button>
+                <button type="button" class="action-btn btn-dispute" onclick="handleRaiseDispute()">Raise a Dispute Instead</button>
             </form>
 
             <div id="status-message"></div>
@@ -224,12 +252,60 @@
     </footer>
 
     <script>
+        // Check URL parameters on load to see if a buyer link was generated with custom items
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const item = urlParams.get('item');
+            const amount = urlParams.get('amount');
+
+            if (item && amount) {
+                document.getElementById('display-item').textContent = decodeURIComponent(item);
+                document.getElementById('display-amount').textContent = `KES ${Number(amount).toLocaleString()}`;
+            }
+        });
+
+        function switchView(view) {
+            const vendorPortal = document.getElementById('vendor-portal');
+            const buyerPortal = document.getElementById('buyer-portal');
+            const navVendor = document.getElementById('nav-vendor');
+            const navBuyer = document.getElementById('nav-buyer');
+
+            if (view === 'vendor') {
+                vendorPortal.classList.remove('hidden');
+                buyerPortal.classList.add('hidden');
+                navVendor.classList.add('active');
+                navBuyer.classList.remove('active');
+            } else {
+                vendorPortal.classList.add('hidden');
+                buyerPortal.classList.remove('hidden');
+                navVendor.classList.remove('active');
+                navBuyer.classList.add('active');
+            }
+        }
+
+        // Vendor link generator form handler
+        document.getElementById('vendor-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const itemName = document.getElementById('item-name').value;
+            const itemAmount = document.getElementById('item-amount').value;
+
+            const baseUrl = window.location.origin + window.location.pathname;
+            const generatedLink = `${baseUrl}?item=${encodeURIComponent(itemName)}&amount=${encodeURIComponent(itemAmount)}`;
+
+            const linkOutput = document.getElementById('link-output');
+            linkOutput.style.color = "#4ade80";
+            linkOutput.innerHTML = `Link Created Successfully!<br><input type="text" readonly value="${generatedLink}" style="margin-top:0.5rem; text-align:center; font-size:0.8rem;" onclick="this.select();">`;
+        });
+
+        // Buyer payment form handler
         document.getElementById('payment-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const phone = document.getElementById('phone').value;
             const payBtn = document.getElementById('pay-btn');
             const statusDiv = document.getElementById('status-message');
+            const currentAmountText = document.getElementById('display-amount').textContent;
+            const rawAmount = parseFloat(currentAmountText.replace(/[^0-9.]/g, '')) || 2537.50;
 
             payBtn.disabled = true;
             payBtn.textContent = "Sending STK Push...";
@@ -242,7 +318,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         phoneNumber: phone,
-                        amount: 2537.50
+                        amount: rawAmount
                     })
                 });
 
@@ -265,8 +341,8 @@
 
         function handleRaiseDispute() {
             const phoneNumber = document.getElementById('phone').value;
-            const item = "Oversized Vintage Hoodie";
-            const amount = "KES 2,537.50";
+            const item = document.getElementById('display-item').textContent;
+            const amount = document.getElementById('display-amount').textContent;
             
             const message = `Hello Amanapay Support, I want to raise a dispute for my order.\n\nItem: ${item}\nAmount: ${amount}\nPhone: ${phoneNumber}\nReason: Item not as described / Defective.`;
             
