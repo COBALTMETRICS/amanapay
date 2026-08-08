@@ -3,70 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Amanapay - Secure Escrow Checkout</title>
+    <title>Amanapay - Secure Escrow & Social Commerce Platform</title>
     <style>
+        :root {
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #38bdf8;
+            letter-spacing: 0.05em;
+        }
+
+        nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            margin-left: 1.5rem;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: var(--text-main);
+        }
+
+        main {
+            flex: 1;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
-            margin: 0;
+            padding: 2rem 1rem;
         }
+
         .checkout-container {
-            background-color: #1e293b;
+            background-color: var(--card-bg);
             padding: 2.5rem;
             border-radius: 12px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
             width: 100%;
-            max-width: 420px;
+            max-width: 440px;
             box-sizing: border-box;
+            border: 1px solid var(--border-color);
         }
+
         h2 {
             margin-top: 0;
-            color: #ffffff;
+            color: var(--text-main);
             font-size: 1.5rem;
             text-align: center;
+            margin-bottom: 1.5rem;
         }
+
         .product-summary {
-            background: #334155;
+            background: #0f172a;
             padding: 1rem;
             border-radius: 8px;
             margin-bottom: 1.5rem;
             font-size: 0.95rem;
+            border: 1px solid var(--border-color);
         }
+
         .product-summary p {
-            margin: 0.4rem 0;
+            margin: 0.5rem 0;
             display: flex;
             justify-content: space-between;
         }
+
         .form-group {
             margin-bottom: 1.25rem;
         }
+
         label {
             display: block;
             margin-bottom: 0.5rem;
             font-size: 0.85rem;
-            color: #94a3b8;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
+
         input {
             width: 100%;
             padding: 0.75rem;
             border: 1px solid #475569;
-            background: #0f172a;
-            color: #ffffff;
+            background: var(--bg-dark);
+            color: var(--text-main);
             border-radius: 6px;
             box-sizing: border-box;
             font-size: 1rem;
         }
+
         input:focus {
             outline: none;
             border-color: #38bdf8;
         }
+
         button {
             width: 100%;
             padding: 0.85rem;
@@ -78,63 +136,92 @@
             transition: background 0.2s;
             margin-top: 0.5rem;
         }
+
         .btn-pay {
-            background-color: #0284c7;
+            background-color: var(--primary);
             color: #ffffff;
         }
+
         .btn-pay:hover {
-            background-color: #0369a1;
+            background-color: var(--primary-dark);
         }
+
         .btn-dispute {
             background-color: transparent;
             color: #f87171;
             border: 1px solid #7f1d1d;
             margin-top: 0.75rem;
         }
+
         .btn-dispute:hover {
             background-color: #7f1d1d22;
         }
+
         #status-message {
             margin-top: 1rem;
             text-align: center;
             font-size: 0.9rem;
             font-weight: 500;
         }
+
+        footer {
+            text-align: center;
+            padding: 1.5rem;
+            background-color: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
     </style>
 </head>
 <body>
 
-    <div class="checkout-container">
-        <h2>Amanapay Checkout</h2>
-        
-        <div class="product-summary">
-            <p><span>Item:</span> <strong>Oversized Vintage Hoodie</strong></p>
-            <p><span>Amount:</span> <strong>KES 2,537.50</strong></p>
-            <p><span>Escrow Status:</span> <strong style="color: #38bdf8;">Protected</strong></p>
-        </div>
+    <header>
+        <div class="logo">Amanapay</div>
+        <nav>
+            <a href="#">Dashboard</a>
+            <a href="#">Transactions</a>
+            <a href="#">Support</a>
+        </nav>
+    </header>
 
-        <form id="payment-form">
-            <div class="form-group">
-                <label for="phone">M-Pesa Phone Number</label>
-                <input type="text" id="phone" value="254795209859" placeholder="2547XXXXXXXX" required>
+    <main>
+        <div class="checkout-container">
+            <h2>Secure Escrow Checkout</h2>
+            
+            <div class="product-summary">
+                <p><span>Item:</span> <strong>Oversized Vintage Hoodie</strong></p>
+                <p><span>Amount:</span> <strong>KES 2,537.50</strong></p>
+                <p><span>Escrow Status:</span> <strong style="color: #38bdf8;">Protected</strong></p>
             </div>
 
-            <button type="submit" class="btn-pay" id="pay-btn">Pay with M-Pesa STK Push</button>
-            <button type="button" class="btn-dispute" onclick="handleRaiseDispute()">Raise a Dispute Instead</button>
-        </form>
+            <form id="payment-form">
+                <div class="form-group">
+                    <label for="phone">M-Pesa Phone Number</label>
+                    <input type="text" id="phone" value="254795209859" placeholder="2547XXXXXXXX" required>
+                </div>
 
-        <div id="status-message"></div>
+                <button type="submit" class="btn-pay" id="pay-btn">Pay with M-Pesa STK Push</button>
+                <button type="button" class="btn-dispute" onclick="handleRaiseDispute()">Raise a Dispute Instead</button>
+            </form>
 
-        <!-- Official IntaSend Trust Badge Integration -->
-        <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: center;">
-            <a href="https://intasend.com/security" target="_blank">
-                <img src="https://intasend-prod-static.s3.amazonaws.com/img/trust-badges/intasend-trust-badge-with-mpesa-hr-dark.png" width="375px" alt="IntaSend Secure Payments (PCI-DSS Compliant)" style="max-width: 100%; height: auto;">
-            </a>
-            <strong style="display: block; color: #fafafa; text-decoration: none; font-size: 0.8em; margin-top: 0.6em;">
-                <a href="https://intasend.com/security" target="_blank" style="color: #fafafa; text-decoration: none;">Secured by IntaSend Payments</a>
-            </strong>
+            <div id="status-message"></div>
+
+            <!-- Official IntaSend Trust Badge Integration -->
+            <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.1); text-align: center;">
+                <a href="https://intasend.com/security" target="_blank">
+                    <img src="https://intasend-prod-static.s3.amazonaws.com/img/trust-badges/intasend-trust-badge-with-mpesa-hr-dark.png" width="375px" alt="IntaSend Secure Payments (PCI-DSS Compliant)" style="max-width: 100%; height: auto;">
+                </a>
+                <strong style="display: block; color: #fafafa; text-decoration: none; font-size: 0.8em; margin-top: 0.6em;">
+                    <a href="https://intasend.com/security" target="_blank" style="color: #fafafa; text-decoration: none;">Secured by IntaSend Payments</a>
+                </strong>
+            </div>
         </div>
-    </div>
+    </main>
+
+    <footer>
+        &copy; 2026 Amanapay. All rights reserved. Built with high-integrity infrastructure.
+    </footer>
 
     <script>
         document.getElementById('payment-form').addEventListener('submit', async function(e) {
@@ -183,18 +270,9 @@
             
             const message = `Hello Amanapay Support, I want to raise a dispute for my order.\n\nItem: ${item}\nAmount: ${amount}\nPhone: ${phoneNumber}\nReason: Item not as described / Defective.`;
             
-            const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+            const whatsappUrl = `https://wa.me/254795209859?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
         }
     </script>
 </body>
 </html>
-            
-            
-             
-           
-       
-           
-
-        
-    
