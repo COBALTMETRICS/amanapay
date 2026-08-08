@@ -1,5 +1,3 @@
-import IntaSend from 'intasend-node';
-
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -16,25 +14,31 @@ export default async function handler(req, res) {
     const { phoneNumber, amount } = req.body;
 
     try {
-        const intasend = new IntaSend(
-            process.env.INTASEND_PUBLIC_KEY,
-            process.env.INTASEND_SECRET_KEY,
-            false // false = Sandbox mode
-        );
-
-        // Corrected IntaSend Node SDK collection method for STK Push
-        let response = await intasend.collection().mpesaStkPush({
-            first_name: "Amanapay",
-            last_name: "Buyer",
-            email: "buyer@amanapay.co",
-            amount: Number(amount),
-            phone_number: phoneNumber,
-            api_ref: "trx_" + Math.random().toString(36).substring(2, 8)
+        const response = await fetch('https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.INTASEND_SECRET_KEY}`
+            },
+            body: JSON.stringify({
+                amount: Number(amount),
+                phone_number: phoneNumber,
+                email: "buyer@amanapay.co",
+                first_name: "Amanapay",
+                last_name: "Buyer",
+                api_ref: "trx_" + Math.random().toString(36).substring(2, 8)
+            })
         });
 
-        return res.status(200).json({ success: true, response });
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(JSON.stringify(data));
+        }
+
+        return res.status(200).json({ success: true, response: data });
     } catch (error) {
-        console.error("IntaSend Error:", error);
+        console.error("IntaSend API Error:", error);
         return res.status(500).json({ success: false, error: error.message || 'Payment failed' });
     }
 }
