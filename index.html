@@ -274,8 +274,11 @@
             alert("Secure Escrow Invoice link copied to clipboard!");
         }
 
-        function triggerMpesaPayment() {
+        async function triggerMpesaPayment() {
             const rawPhone = document.getElementById('b-phone').value.trim();
+            const amountText = document.getElementById('invoice-total').innerText;
+            const amount = amountText.replace(/[^0-9.]/g, ''); 
+
             if(!rawPhone) {
                 alert("Please enter a valid M-Pesa phone number.");
                 return;
@@ -286,8 +289,27 @@
                 formattedPhone = '254' + rawPhone.slice(1);
             }
 
-            alert("STK Push sent successfully to " + formattedPhone + "! Check your phone to authorize.");
-            switchView('receipt');
+            alert("Initiating secure M-Pesa STK push via IntaSend...");
+
+            try {
+                const response = await fetch('/api/pay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumber: formattedPhone, amount: amount })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    alert("STK Push sent successfully to " + formattedPhone + "! Check your phone prompt.");
+                    switchView('receipt');
+                } else {
+                    alert("Gateway Error: " + (data.error || "Could not process payment"));
+                }
+            } catch (err) {
+                console.error("Network or server error:", err);
+                alert("Failed to communicate with the payment server.");
+            }
         }
 
         function showDisputeForm() {
@@ -317,3 +339,19 @@
     </script>
 </body>
 </html>
+       
+    
+           
+            
+                       
+               
+                    
+            
+            
+             
+           
+       
+           
+
+        
+    
