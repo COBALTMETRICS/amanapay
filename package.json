@@ -1,9 +1,6 @@
 {
   "name": "amanapay",
   "version": "1.0.0",
-  "scripts": {
-    "start": "node api/pay.js"
-  },
   "dependencies": {
     "intasend-node": "^3.0.2"
   }
