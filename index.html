@@ -221,8 +221,14 @@
     </main>
 
     <script>
+        let currentTransactionId = 'trx_' + Math.random().toString(36).substring(2, 9);
+        let currentTotalText = 'KES 2,537.50';
+
         window.onload = function() {
             const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('id')) {
+                currentTransactionId = urlParams.get('id');
+            }
             if (urlParams.get('view') === 'checkout') {
                 switchView('checkout');
                 const desc = urlParams.get('desc') || 'Custom Item';
@@ -230,10 +236,12 @@
                 const fee = amount * 0.015;
                 const total = amount + fee;
 
+                currentTotalText = 'KES ' + total.toLocaleString();
+
                 document.getElementById('invoice-item-title').innerText = decodeURIComponent(desc);
                 document.getElementById('invoice-item-price').innerText = 'KES ' + amount.toLocaleString();
                 document.getElementById('invoice-escrow-fee').innerText = 'KES ' + fee.toLocaleString();
-                document.getElementById('invoice-total').innerText = 'KES ' + total.toLocaleString();
+                document.getElementById('invoice-total').innerText = currentTotalText;
             }
         }
 
@@ -257,6 +265,9 @@
                 document.getElementById('view-faq').classList.remove('hidden');
                 document.getElementById('nav-faq').classList.add('active');
             } else if (viewName === 'receipt') {
+                // Populate dynamic receipt values before showing
+                document.getElementById('rec-id').innerText = currentTransactionId;
+                document.getElementById('rec-amount').innerText = currentTotalText;
                 document.getElementById('view-receipt').classList.remove('hidden');
             }
         }
@@ -266,10 +277,10 @@
             const amount = document.getElementById('v-amount').value || "2500";
             const phone = document.getElementById('v-phone').value || "";
 
-            const uniqueId = 'trx_' + Math.random().toString(36).substring(2, 9);
+            currentTransactionId = 'trx_' + Math.random().toString(36).substring(2, 9);
             const liveDomain = window.location.origin;
 
-            const secureLink = `${liveDomain}/?view=checkout&id=${uniqueId}&amount=${amount}&desc=${encodeURIComponent(desc)}&vphone=${phone}`;
+            const secureLink = `${liveDomain}/?view=checkout&id=${currentTransactionId}&amount=${amount}&desc=${encodeURIComponent(desc)}&vphone=${phone}`;
             
             document.getElementById('generated-link').value = secureLink;
             document.getElementById('v-result').style.display = 'block';
