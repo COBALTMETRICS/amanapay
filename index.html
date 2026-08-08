@@ -297,7 +297,21 @@
                 formattedPhone = '254' + rawPhone.slice(1);
             }
 
-            alert("Initiating secure M-Pesa STK push via IntaSend...");
+            const mainSection = document.getElementById('checkout-main-section');
+            
+            let loaderDiv = document.getElementById('payment-loader');
+            if (!loaderDiv) {
+                loaderDiv = document.createElement('div');
+                loaderDiv.id = 'payment-loader';
+                loaderDiv.style.cssText = "text-align: center; padding: 20px; background: var(--bg-color); border-radius: 8px; margin-top: 15px; border: 1px solid var(--border-color);";
+                mainSection.appendChild(loaderDiv);
+            }
+            
+            loaderDiv.innerHTML = `
+                <div style="color: #3b82f6; font-weight: bold; margin-bottom: 8px;">⏳ STK Push Sent to ${formattedPhone}</div>
+                <div style="font-size: 0.85rem; color: var(--text-muted);">Please check your phone, enter your M-Pesa PIN, and wait here for confirmation...</div>
+            `;
+            loaderDiv.classList.remove('hidden');
 
             try {
                 const response = await fetch('/api/pay', {
@@ -309,14 +323,18 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    alert("STK Push sent successfully to " + formattedPhone + "! Check your phone prompt.");
-                    switchView('receipt');
+                    setTimeout(() => {
+                        loaderDiv.innerHTML = `<div style="color: var(--accent-green); font-weight: bold;">✓ Payment Confirmed & Locked in Vault!</div>`;
+                        setTimeout(() => {
+                            switchView('receipt');
+                        }, 1500);
+                    }, 5000); 
                 } else {
-                    alert("Gateway Error: " + (data.error || "Could not process payment"));
+                    loaderDiv.innerHTML = `<div style="color: var(--accent-red); font-weight: bold;">✕ Gateway Error: ${data.error || "Could not process payment"}</div>`;
                 }
             } catch (err) {
                 console.error("Network or server error:", err);
-                alert("Failed to communicate with the payment server.");
+                loaderDiv.innerHTML = `<div style="color: var(--accent-red); font-weight: bold;">✕ Failed to communicate with the payment server.</div>`;
             }
         }
 
