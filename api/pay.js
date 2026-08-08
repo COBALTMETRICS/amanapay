@@ -19,10 +19,11 @@ export default async function handler(req, res) {
         const intasend = new IntaSend(
             process.env.INTASEND_PUBLIC_KEY,
             process.env.INTASEND_SECRET_KEY,
-            false
+            false // false = Sandbox mode
         );
 
-        let response = await intasend.collection().STKPush({
+        // Corrected IntaSend Node SDK collection method for STK Push
+        let response = await intasend.collection().mpesaStkPush({
             first_name: "Amanapay",
             last_name: "Buyer",
             email: "buyer@amanapay.co",
