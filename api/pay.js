@@ -12,9 +12,11 @@ export default async function handler(req, res) {
     }
 
     const { phoneNumber, amount } = req.body;
+    const apiRef = "trx_" + Math.random().toString(36).substring(2, 8);
 
     try {
-        const response = await fetch('https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/', {
+        // 1. Trigger IntaSend M-Pesa STK Push Sandbox Request
+        const intasendResponse = await fetch('https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -26,14 +28,31 @@ export default async function handler(req, res) {
                 email: "buyer@amanapay.co",
                 first_name: "Amanapay",
                 last_name: "Buyer",
-                api_ref: "trx_" + Math.random().toString(36).substring(2, 8)
+                api_ref: apiRef
             })
         });
 
-        const data = await response.json();
+        const data = await intasendResponse.json();
 
-        if (!response.ok) {
+        if (!intasendResponse.ok) {
             throw new Error(JSON.stringify(data));
+        }
+
+        // 2. Automatically log the successful transaction to your Google Sheet CRM
+        try {
+            await fetch('https://script.google.com/macros/s/AKfycbypUtJBHD_8FTVP03n_LDHNai8AeLqG9_q6kMM4sMzPJ6iCVmc2aHNXuZ2BnDhkdRlTSw/exec', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    api_ref: apiRef,
+                    phone_number: phoneNumber,
+                    amount: amount,
+                    status: "SUCCESS"
+                })
+            });
+        } catch (sheetError) {
+            console.error("Google Sheet Logging Error:", sheetError);
+            // Non-blocking error so the payment flow still succeeds even if logging fails
         }
 
         return res.status(200).json({ success: true, response: data });
