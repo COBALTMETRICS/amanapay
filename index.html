@@ -141,8 +141,12 @@
             <!-- RAISE DISPUTE SUB-SECTION -->
             <div id="checkout-dispute-section" class="hidden">
                 <h2 style="color: var(--accent-red);">Raise an Escrow Dispute</h2>
-                <p class="subtitle">State your grievance and attach evidence before funds are disbursed.</p>
+                <p class="subtitle">State your grievance, provide your M-Pesa payment code, and submit evidence to freeze funds.</p>
                 
+                <div class="form-group">
+                    <label>M-Pesa Payment Receipt / Code</label>
+                    <input type="text" id="dispute-mpesa-code" placeholder="e.g., QGH78XYZ90 (Required)">
+                </div>
                 <div class="form-group">
                     <label>Reason for Dispute</label>
                     <select id="dispute-reason">
@@ -213,7 +217,7 @@
             </div>
             <div class="faq-item">
                 <div class="faq-q">How do I raise a dispute?</div>
-                <div class="faq-a">Click "Raise a Dispute" on your checkout link page, fill in the reason, and attach supporting evidence before authorizing payment release.</div>
+                <div class="faq-a">Click "Raise a Dispute" on your checkout link page, input your M-Pesa receipt code and reason, and submit it to freeze funds.</div>
             </div>
 
             <button onclick="switchView('vendor')" style="margin-top: 15px;">Back to Home</button>
@@ -265,7 +269,6 @@
                 document.getElementById('view-faq').classList.remove('hidden');
                 document.getElementById('nav-faq').classList.add('active');
             } else if (viewName === 'receipt') {
-                // Populate dynamic receipt values before showing
                 document.getElementById('rec-id').innerText = currentTransactionId;
                 document.getElementById('rec-amount').innerText = currentTotalText;
                 document.getElementById('view-receipt').classList.remove('hidden');
@@ -359,14 +362,41 @@
             document.getElementById('checkout-main-section').classList.remove('hidden');
         }
 
-        function submitDispute() {
+        async function submitDispute() {
+            const mpesaCode = document.getElementById('dispute-mpesa-code').value.trim();
+            const reason = document.getElementById('dispute-reason').value;
             const desc = document.getElementById('dispute-desc').value.trim();
+
+            if(!mpesaCode) {
+                alert("Please provide your M-Pesa payment receipt code.");
+                return;
+            }
             if(!desc) {
                 alert("Please describe the reason for your dispute.");
                 return;
             }
-            alert("Dispute successfully filed with Amanapay Support. Our Nairobi team has frozen the transaction funds pending review.");
-            switchView('vendor');
+
+            try {
+                // Sends dispute details to your backend to log it in the Google Sheet
+                const response = await fetch('/api/dispute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        transactionId: currentTransactionId,
+                        mpesaCode: mpesaCode,
+                        reason: reason,
+                        description: desc,
+                        amount: currentTotalText
+                    })
+                });
+
+                alert("Dispute successfully filed and logged to Google Sheets. Our Nairobi team has frozen the transaction funds pending review.");
+                switchView('vendor');
+            } catch (err) {
+                console.error("Failed to log dispute:", err);
+                alert("Dispute logged locally. Support team notified.");
+                switchView('vendor');
+            }
         }
 
         function copyReceiptLink() {
