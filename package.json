@@ -2,6 +2,6 @@
   "name": "amanapay",
   "version": "1.0.0",
   "dependencies": {
-    "intasend-node": "^3.0.2"
+    "intasend-node": "latest"
   }
 }
