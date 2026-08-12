@@ -345,35 +345,34 @@
             
             loaderDiv.innerHTML = `
                 <div style="color: #3b82f6; font-weight: bold; margin-bottom: 8px;">⏳ STK Push Sent to ${formattedPhone}</div>
-                <div style="font-size: 0.85rem; color: var(--text-muted);">Please check your phone, enter your M-Pesa PIN, and wait here for confirmation...</div>
+                <div style="font-size: 0.85rem; color: var(--text-muted);">Please check your phone, enter your M-Pesa PIN, and wait here for IntaSend confirmation...</div>
             `;
             loaderDiv.classList.remove('hidden');
 
             try {
+                // Request backend or IntaSend STK push and verify actual success status code
                 const response = await fetch('/api/pay', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phoneNumber: formattedPhone, amount: amount })
+                    body: JSON.stringify({ phoneNumber: formattedPhone, amount: amount, transactionId: currentTransactionId })
                 });
 
                 const data = await response.json();
 
-                if (data.success) {
+                // STRICT VERIFICATION: Ensure IntaSend returns a confirmed/successful state before proceeding to receipt
+                if (data.success && (data.status === 'COMPLETE' || data.status === 'SUCCESS' || data.status === 'APPROVED')) {
+                    loaderDiv.innerHTML = `<div style="color: var(--accent-green); font-weight: bold;">✓ IntaSend Verified: Payment Locked in Vault!</div>`;
                     setTimeout(() => {
-                        loaderDiv.innerHTML = `<div style="color: var(--accent-green); font-weight: bold;">✓ Payment Confirmed & Locked in Vault!</div>`;
-                        setTimeout(() => {
-                            switchView('receipt');
-                        }, 1500);
-                    }, 5000); 
+                        switchView('receipt');
+                    }, 1200);
                 } else {
-                    loaderDiv.innerHTML = `<div style="color: var(--accent-red); font-weight: bold;">✕ Gateway Error: ${data.error || "Could not process payment"}</div>`;
+                    // Transaction failed, cancelled, or pending timeout - do not issue receipt
+                    const failReason = data.message || data.error || "Payment was cancelled or failed verification.";
+                    loaderDiv.innerHTML = `<div style="color: var(--accent-red); font-weight: bold;">✕ Transaction Not Completed</div><div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">${failReason}</div>`;
                 }
             } catch (err) {
-                console.error("Network or server error:", err);
-                // Fallback simulation for seamless user flow preview
-                setTimeout(() => {
-                    switchView('receipt');
-                }, 2000);
+                console.error("Network or verification error:", err);
+                loaderDiv.innerHTML = `<div style="color: var(--accent-red); font-weight: bold;">✕ Verification Failed</div><div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">Could not confirm transaction status with IntaSend gateway. Please try again.</div>`;
             }
         }
 
@@ -386,7 +385,6 @@
             statusEl.innerText = "Processing automated payout to vendor...";
             statusEl.style.color = "#f59e0b";
 
-            // Deduct platform 3% + estimated gateway cut, leaving balance for vendor payout
             const platformCut = currentItemAmount * 0.03;
             const payoutAmount = currentItemAmount - platformCut;
 
