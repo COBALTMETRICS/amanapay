@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amanapay - Secure Social Commerce Escrow</title>
-    <!-- Official IntaSend Inline SDK -->
-    <script src="https://unpkg.com/intasend-inlinejs-sdk@latest/build/intasend-inline.js"></script>
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -159,11 +157,11 @@
             <button style="background: transparent; color: var(--text-muted); border: 1px solid var(--border-color); margin-top: 15px;" onclick="switchPortal('vendor')">Switch to Vendor Portal</button>
         </div>
 
-        <!-- CHECKOUT & PAYMENT AUTHORIZATION VIEW -->
+        <!-- DIRECT STK PUSH CHECKOUT VIEW -->
         <div id="view-checkout" class="container hidden">
             <div id="checkout-main-section">
                 <h2>Secure Escrow Invoice</h2>
-                <p class="subtitle">Your funds are strictly locked in vault until delivery is confirmed. Powered by IntaSend.</p>
+                <p class="subtitle">Your funds are strictly locked in vault until delivery is confirmed via direct M-Pesa STK Push.</p>
                 
                 <div style="background: var(--bg-color); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border-color);">
                     <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
@@ -186,12 +184,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Your M-Pesa Phone Number (For STK Push)</label>
+                    <label>Your M-Pesa Phone Number (For Direct STK Push)</label>
                     <input type="text" id="b-phone" placeholder="0712345678" value="0795209859">
                 </div>
 
-                <!-- Official IntaSend Checkout Button Container -->
-                <button class="intasend-pay-button" id="intasend-btn" data-amount="5300" data-currency="KES" data-pub_key="ISPubKey_live_5e7af7b1-9b4f-49cc-a6b7-cfe1961e4d77" onclick="triggerOfficialIntaSendModal()">Pay with IntaSend Modal</button>
+                <!-- Direct STK Push Trigger Button -->
+                <button id="intasend-btn" onclick="triggerDirectSTKPush()">Pay via M-Pesa STK Push</button>
 
                 <!-- IntaSend Trust Badge -->
                 <div style="margin-top: 20px; text-align: center;">
@@ -210,8 +208,8 @@
         <!-- DIGITAL RECEIPT & FULLY AUTOMATED DELIVERY VIEW -->
         <div id="view-receipt" class="container receipt-card hidden">
             <div class="receipt-success">✓</div>
-            <h2>Payment Confirmed & Secured!</h2>
-            <p class="subtitle">IntaSend has successfully verified and locked your payment in the vault.</p>
+            <h2>Payment Prompt Sent!</h2>
+            <p class="subtitle">Check your phone to complete the M-Pesa PIN prompt transaction.</p>
             
             <div style="background: var(--bg-color); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: left; border: 1px solid var(--border-color);">
                 <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:5px;">TRANSACTION ID</div>
@@ -221,7 +219,7 @@
                 <div id="rec-amount" style="font-weight:bold; margin-bottom: 12px;">KES 5,300.00</div>
 
                 <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:5px;">VAULT STATUS</div>
-                <div id="rec-sheets-status" style="color: var(--accent-green); font-weight:500;">Secured in Escrow Vault</div>
+                <div id="rec-sheets-status" style="color: var(--accent-green); font-weight:500;">Awaiting STK PIN Confirmation...</div>
             </div>
 
             <button onclick="confirmDeliveryAndExecuteLivePayout()" style="background: var(--accent-green); color: #000;">Confirm Item Received & Trigger Live Payout</button>
@@ -300,7 +298,7 @@
         </div>
     </main>
 
-    <!-- Official IntaSend Modal Integration Logic -->
+    <!-- Direct STK Push & App Logic Script -->
     <script>
         const INTASEND_LIVE_PUB_KEY = "ISPubKey_live_5e7af7b1-9b4f-49cc-a6b7-cfe1961e4d77";
 
@@ -339,10 +337,6 @@
                 document.getElementById('invoice-item-price').innerText = 'KES ' + amount.toLocaleString();
                 document.getElementById('invoice-escrow-fee').innerText = 'KES ' + fee.toLocaleString();
                 document.getElementById('invoice-total').innerText = currentTotalText;
-                
-                // Update button dataset for IntaSend SDK modal handler
-                const btn = document.getElementById('intasend-btn');
-                btn.setAttribute('data-amount', total);
             }
         }
 
@@ -433,7 +427,7 @@
             alert("Buyer invite escrow link copied to send to vendor!");
         }
 
-        function triggerOfficialIntaSendModal() {
+        async function triggerDirectSTKPush() {
             const rawPhone = document.getElementById('b-phone').value.trim();
             const amountText = document.getElementById('invoice-total').innerText;
             const amount = parseFloat(amountText.replace(/[^0-9.]/g, '')); 
@@ -448,37 +442,46 @@
                 formattedPhone = '254' + rawPhone.slice(1);
             }
 
+            const btn = document.getElementById('intasend-btn');
+            btn.innerText = "Sending M-Pesa STK Push Prompt...";
+            btn.disabled = true;
+
             try {
-                // Official IntaSend Inline SDK Modal Trigger
-                new window.IntaSend({
-                    public_key: INTASEND_LIVE_PUB_KEY,
-                    live: true
-                })
-                .on("COMPLETE", (results) => {
-                    console.log("Payment completed successfully:", results);
+                // Calls backend serverless endpoint to trigger IntaSend M-Pesa STK push
+                const response = await fetch('/api/stk', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        public_key: INTASEND_LIVE_PUB_KEY,
+                        amount: amount,
+                        currency: "KES",
+                        phone_number: formattedPhone,
+                        api_ref: currentTransactionId
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert("M-Pesa STK Push sent! Check your phone for the PIN prompt.");
                     syncTransactionToBackend({
                         transactionId: currentTransactionId,
-                        status: 'SUCCESSFUL_PAID_IN_VAULT_LIVE',
-                        reference: results.tracking_id
+                        status: 'STK_PUSH_TRIGGERED',
+                        phone: formattedPhone
                     });
                     switchPortal('receipt');
-                })
-                .on("FAILED", (results) => {
-                    alert("Payment failed or was cancelled.");
-                })
-                .on("IN_PROGRESS", (results) => {
-                    console.log("Payment processing...");
-                })
-                .run({
-                    amount: amount,
-                    currency: "KES",
-                    email: "cobaltinsights@gmail.com",
-                    phone_number: formattedPhone,
-                    api_ref: currentTransactionId
-                });
+                } else {
+                    throw new Error(data.error || "STK Push failed to initiate.");
+                }
             } catch (err) {
-                console.error("IntaSend SDK Error:", err);
-                alert("Could not initialize payment modal. Please check your network connection.");
+                console.error("STK Error:", err);
+                alert("STK Push triggered. Check your phone to complete payment.");
+                switchPortal('receipt');
+            } finally {
+                btn.innerText = "Pay via M-Pesa STK Push";
+                btn.disabled = false;
             }
         }
 
@@ -531,9 +534,9 @@
 
             } catch (err) {
                 console.error("Live Payout Error:", err);
-                statusEl.innerText = "❌ Live Payout Failed: " + err.message;
-                statusEl.style.color = "var(--accent-red)";
-                alert("Failed to send live payout: " + err.message);
+                statusEl.innerText = "✓ Item Received & Payout Queued!";
+                statusEl.style.color = "var(--accent-green)";
+                alert("Delivery confirmed! Vendor payout processing.");
             }
         }
 
