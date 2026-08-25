@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amanapay - Secure Social Commerce Escrow</title>
-    <!-- Pre-load IntaSend SDK directly in the head to avoid runtime loading blocks -->
-    <script src="https://unpkg.com/@intasend/intasend-inlinejs-sdk@3.0.4/build/intasend-inline.js"></script>
+    <!-- Preload hint -->
+    <link rel="preconnect" href="https://unpkg.com">
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -107,7 +107,6 @@
                 <button style="background: #3b82f6; color: #fff; margin-top: 8px;" onclick="copyLink()">Copy Link</button>
             </div>
 
-            <!-- Embedded 5-Star Feedback Component for Vendor -->
             <div class="feedback-box">
                 <label style="text-align: center;">Rate Your Vendor Experience</label>
                 <div class="star-container" id="vendor-stars">
@@ -196,7 +195,7 @@
                     <input type="text" id="b-phone" placeholder="0712345678" value="0795209859">
                 </div>
 
-                <button onclick="triggerLiveIntaSendPayment()">Authorize & Pay via Live M-Pesa</button>
+                <button onclick="triggerLiveIntaSendPayment()" id="pay-btn">Authorize & Pay via Live M-Pesa</button>
 
                 <!-- IntaSend Trust Badge -->
                 <div style="margin-top: 20px; text-align: center;">
@@ -229,11 +228,9 @@
                 <div id="rec-sheets-status" style="color: var(--accent-green); font-weight:500;">Secured in Escrow Vault</div>
             </div>
 
-            <!-- FULLY AUTOMATED DELIVERY AUTHORIZATION -->
             <button onclick="confirmDeliveryAndExecuteLivePayout()" style="background: var(--accent-green); color: #000;">Confirm Item Received & Trigger Live Payout</button>
             <button class="btn-dispute" onclick="switchPortal('dispute')" style="margin-top: 10px;">Raise a Dispute (Freezes Payout)</button>
             
-            <!-- Buyer 5-Star Feedback Component -->
             <div class="feedback-box">
                 <label style="text-align: center;">Rate Your Buyer Transaction Experience</label>
                 <div class="star-container" id="buyer-stars">
@@ -267,7 +264,6 @@
                 📍 Office: Nairobi, Kenya
             </div>
 
-            <!-- Customer Care 5-Star Feedback Component -->
             <div class="feedback-box">
                 <label style="text-align: center;">Rate Your Customer Support Experience</label>
                 <div class="star-container" id="support-stars">
@@ -308,6 +304,7 @@
         </div>
     </main>
 
+    <!-- Self-healing script injection loader -->
     <script>
         // LIVE INTASEND CONFIGURATION KEYS
         const INTASEND_LIVE_PUB_KEY = "ISPubKey_live_5e7af7b1-9b4f-49cc-a6b7-cfe1961e4d77";
@@ -323,6 +320,28 @@
             buyer: { rating: 5, word: 'Trusted' },
             support: { rating: 5, word: 'Trusted' }
         };
+
+        // Dynamically load SDK if missing
+        function ensureIntaSendLoaded(callback) {
+            if (typeof window.IntaSend !== 'undefined') {
+                callback();
+                return;
+            }
+            const existingScript = document.getElementById('intasend-sdk');
+            if (existingScript) {
+                existingScript.onload = callback;
+                return;
+            }
+            const script = document.createElement('script');
+            script.id = 'intasend-sdk';
+            script.src = "https://unpkg.com/@intasend/intasend-inlinejs-sdk@3.0.4/build/intasend-inline.js";
+            script.async = true;
+            script.onload = callback;
+            script.onerror = function() {
+                alert("Could not load IntaSend SDK script. Please check your network connection.");
+            };
+            document.head.appendChild(script);
+        }
 
         window.onload = function() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -347,6 +366,10 @@
                 document.getElementById('invoice-escrow-fee').innerText = 'KES ' + fee.toLocaleString();
                 document.getElementById('invoice-total').innerText = currentTotalText;
             }
+            // Preload SDK in background
+            ensureIntaSendLoaded(function() {
+                console.log("IntaSend SDK ready.");
+            });
         }
 
         function switchPortal(viewName) {
@@ -436,7 +459,7 @@
             alert("Buyer invite escrow link copied to send to vendor!");
         }
 
-        // PRE-LOADED SDK INTASEND EXECUTION HANDLER
+        // SELF-HEALING INTASEND EXECUTION HANDLER
         function triggerLiveIntaSendPayment() {
             const rawPhone = document.getElementById('b-phone').value.trim();
             const amountText = document.getElementById('invoice-total').innerText;
@@ -452,46 +475,46 @@
                 formattedPhone = '254' + rawPhone.slice(1);
             }
 
-            if (typeof window.IntaSend === 'undefined') {
-                alert("IntaSend SDK is still loading or blocked. Please refresh the page.");
-                return;
-            }
+            const btn = document.getElementById('pay-btn');
+            btn.innerText = "Loading Payment Gateway...";
 
-            try {
-                window.intaSendPay = new window.IntaSend({
-                    public_key: INTASEND_LIVE_PUB_KEY,
-                    live: true
-                });
-
-                window.intaSendPay.on("COMPLETE", (results) => {
-                    console.log("Payment Success:", results);
-                    syncTransactionToBackend({
-                        transactionId: currentTransactionId,
-                        status: 'SUCCESSFUL_PAID_IN_VAULT_LIVE',
-                        reference: results.tracking_id
+            ensureIntaSendLoaded(function() {
+                btn.innerText = "Authorize & Pay via Live M-Pesa";
+                try {
+                    window.intaSendPay = new window.IntaSend({
+                        public_key: INTASEND_LIVE_PUB_KEY,
+                        live: true
                     });
-                    switchPortal('receipt');
-                }).on("FAILED", (results) => {
-                    alert("Payment failed or was cancelled.");
-                }).on("IN_PROGRESS", (results) => {
-                    console.log("STK Push sent to phone...");
-                });
 
-                window.intaSendPay.run({
-                    amount: amount,
-                    currency: "KES",
-                    email: "cobaltinsights@gmail.com",
-                    phone_number: formattedPhone,
-                    api_ref: currentTransactionId
-                });
+                    window.intaSendPay.on("COMPLETE", (results) => {
+                        console.log("Payment Success:", results);
+                        syncTransactionToBackend({
+                            transactionId: currentTransactionId,
+                            status: 'SUCCESSFUL_PAID_IN_VAULT_LIVE',
+                            reference: results.tracking_id
+                        });
+                        switchPortal('receipt');
+                    }).on("FAILED", (results) => {
+                        alert("Payment failed or was cancelled.");
+                    }).on("IN_PROGRESS", (results) => {
+                        console.log("STK Push sent to phone...");
+                    });
 
-            } catch (error) {
-                console.error("IntaSend Init Error:", error);
-                alert("Payment initialization error: " + error.message);
-            }
+                    window.intaSendPay.run({
+                        amount: amount,
+                        currency: "KES",
+                        email: "cobaltinsights@gmail.com",
+                        phone_number: formattedPhone,
+                        api_ref: currentTransactionId
+                    });
+
+                } catch (error) {
+                    console.error("IntaSend Init Error:", error);
+                    alert("Payment initialization error: " + error.message);
+                }
+            });
         }
 
-        // LIVE AUTOMATED PAYOUT CALL UPON DELIVERY CONFIRMATION
         async function confirmDeliveryAndExecuteLivePayout() {
             if (isDisputed) {
                 alert("Action Blocked: This transaction has an active dispute flag.");
@@ -547,7 +570,6 @@
             }
         }
 
-        // SEND DISPUTE DIRECTLY TO EMAIL
         function sendDisputeEmail() {
             const issue = document.getElementById('dispute-issue').value.trim();
             const txLink = document.getElementById('dispute-tx-link').value.trim();
@@ -591,7 +613,6 @@
             alert("Digital receipt proof copied to clipboard!");
         }
 
-        // Interactive 5-Star Feedback Handlers
         function setRating(portal, score) {
             feedbackState[portal].rating = score;
             const container = document.getElementById(portal + '-stars');
