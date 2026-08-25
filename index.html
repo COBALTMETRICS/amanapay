@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amanapay - Secure Social Commerce Escrow</title>
+    <!-- Official IntaSend Inline SDK -->
+    <script src="https://unpkg.com/intasend-inlinejs-sdk@latest/build/intasend-inline.js"></script>
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -183,16 +185,13 @@
                     </div>
                 </div>
 
-                <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom: 15px; background: rgba(16, 185, 129, 0.05); padding: 10px; border-radius: 6px; border-left: 3px solid var(--accent-green);">
-                    <strong>Strict Security Policy:</strong> Amanapay NEVER generates receipts or validates payments unless IntaSend explicitly confirms successful funds receipt via server callback.
-                </div>
-
                 <div class="form-group">
                     <label>Your M-Pesa Phone Number (For STK Push)</label>
                     <input type="text" id="b-phone" placeholder="0712345678" value="0795209859">
                 </div>
 
-                <button onclick="triggerLiveIntaSendPayment()" id="pay-btn">Proceed to Official IntaSend Checkout</button>
+                <!-- Official IntaSend Checkout Button Container -->
+                <button class="intasend-pay-button" id="intasend-btn" data-amount="5300" data-currency="KES" data-pub_key="ISPubKey_live_5e7af7b1-9b4f-49cc-a6b7-cfe1961e4d77" onclick="triggerOfficialIntaSendModal()">Pay with IntaSend Modal</button>
 
                 <!-- IntaSend Trust Badge -->
                 <div style="margin-top: 20px; text-align: center;">
@@ -301,7 +300,7 @@
         </div>
     </main>
 
-    <!-- Strict Callback Logic (No False-Positive Receipts) -->
+    <!-- Official IntaSend Modal Integration Logic -->
     <script>
         const INTASEND_LIVE_PUB_KEY = "ISPubKey_live_5e7af7b1-9b4f-49cc-a6b7-cfe1961e4d77";
 
@@ -326,12 +325,6 @@
                 vendorPhoneValue = urlParams.get('vphone');
             }
             
-            // Check if IntaSend redirected back with a status parameter
-            if (urlParams.get('status') === 'COMPLETE' || urlParams.get('checkout_status') === 'COMPLETE') {
-                switchPortal('receipt');
-                return;
-            }
-
             if (urlParams.get('view') === 'checkout') {
                 switchPortal('checkout');
                 const desc = urlParams.get('desc') || 'Custom Item';
@@ -346,6 +339,10 @@
                 document.getElementById('invoice-item-price').innerText = 'KES ' + amount.toLocaleString();
                 document.getElementById('invoice-escrow-fee').innerText = 'KES ' + fee.toLocaleString();
                 document.getElementById('invoice-total').innerText = currentTotalText;
+                
+                // Update button dataset for IntaSend SDK modal handler
+                const btn = document.getElementById('intasend-btn');
+                btn.setAttribute('data-amount', total);
             }
         }
 
@@ -436,7 +433,7 @@
             alert("Buyer invite escrow link copied to send to vendor!");
         }
 
-        function triggerLiveIntaSendPayment() {
+        function triggerOfficialIntaSendModal() {
             const rawPhone = document.getElementById('b-phone').value.trim();
             const amountText = document.getElementById('invoice-total').innerText;
             const amount = parseFloat(amountText.replace(/[^0-9.]/g, '')); 
@@ -451,12 +448,38 @@
                 formattedPhone = '254' + rawPhone.slice(1);
             }
 
-            // Using official IntaSend Standard Payment Link / API endpoint structure safely
-            const redirectUrl = encodeURIComponent(window.location.origin + window.location.pathname + `?view=receipt&id=${currentTransactionId}`);
-            const intaSendCheckoutUrl = `https://payment.intasend.com/pay/?public_key=${INTASEND_LIVE_PUB_KEY}&amount=${amount}&currency=KES&phone_number=${formattedPhone}&api_ref=${currentTransactionId}&redirect_url=${redirectUrl}`;
-
-            // Redirect user directly to IntaSend's secure payment gateway page
-            window.location.href = intaSendCheckoutUrl;
+            try {
+                // Official IntaSend Inline SDK Modal Trigger
+                new window.IntaSend({
+                    public_key: INTASEND_LIVE_PUB_KEY,
+                    live: true
+                })
+                .on("COMPLETE", (results) => {
+                    console.log("Payment completed successfully:", results);
+                    syncTransactionToBackend({
+                        transactionId: currentTransactionId,
+                        status: 'SUCCESSFUL_PAID_IN_VAULT_LIVE',
+                        reference: results.tracking_id
+                    });
+                    switchPortal('receipt');
+                })
+                .on("FAILED", (results) => {
+                    alert("Payment failed or was cancelled.");
+                })
+                .on("IN_PROGRESS", (results) => {
+                    console.log("Payment processing...");
+                })
+                .run({
+                    amount: amount,
+                    currency: "KES",
+                    email: "cobaltinsights@gmail.com",
+                    phone_number: formattedPhone,
+                    api_ref: currentTransactionId
+                });
+            } catch (err) {
+                console.error("IntaSend SDK Error:", err);
+                alert("Could not initialize payment modal. Please check your network connection.");
+            }
         }
 
         async function confirmDeliveryAndExecuteLivePayout() {
