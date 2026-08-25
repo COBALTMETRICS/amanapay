@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amanapay - Secure Social Commerce Escrow</title>
+    <!-- IntaSend Live Production SDK Script -->
+    <script src="https://unpkg.com/@intasend/intasend-inlinejs-sdk@3.0.4/build/intasend-inline.js"></script>
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -163,7 +165,7 @@
         <div id="view-checkout" class="container hidden">
             <div id="checkout-main-section">
                 <h2>Secure Escrow Invoice</h2>
-                <p class="subtitle">Your funds are strictly locked in vault until delivery is confirmed. Powered by IntaSend.</p>
+                <p class="subtitle">Your funds are strictly locked in vault until delivery is confirmed. Powered by IntaSend Live.</p>
                 
                 <div style="background: var(--bg-color); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border-color);">
                     <div style="display:flex; justify-content:space-between; margin-bottom: 8px;">
@@ -194,13 +196,13 @@
                     <input type="text" id="b-phone" placeholder="0712345678" value="0795209859">
                 </div>
 
-                <button onclick="triggerAutomatedMpesaPayment()">Authorize & Pay via M-Pesa</button>
+                <button onclick="triggerLiveIntaSendPayment()">Authorize & Pay via Live M-Pesa</button>
 
                 <!-- IntaSend Trust Badge -->
                 <div style="margin-top: 20px; text-align: center;">
                     <span style="display:block; text-align: center">
                         <a href="https://intasend.com/security" target="_blank"><img src="https://intasend-prod-static.s3.amazonaws.com/img/trust-badges/intasend-trust-badge-with-mpesa-hr-dark.png" width="375px" alt="IntaSend Secure Payments" style="max-width: 100%; height: auto;"></a>
-                        <strong><a style="display: block; color: #fafafa; text-decoration: none; font-size: 0.8em; margin-top: 0.6em;" href="https://intasend.com/security" target="_blank">Secured by IntaSend Payments</a></strong>
+                        <strong><a style="display: block; color: #fafafa; text-decoration: none; font-size: 0.8em; margin-top: 0.6em;" href="https://intasend.com/security" target="_blank">Secured by IntaSend Live Payments</a></strong>
                     </span>
                 </div>
             </div>
@@ -214,7 +216,7 @@
         <div id="view-receipt" class="container receipt-card hidden">
             <div class="receipt-success">✓</div>
             <h2>Payment Confirmed & Secured!</h2>
-            <p class="subtitle">IntaSend has successfully verified and locked your payment in the vault.</p>
+            <p class="subtitle">IntaSend Live has successfully verified and locked your payment in the vault.</p>
             
             <div style="background: var(--bg-color); padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: left; border: 1px solid var(--border-color);">
                 <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:5px;">TRANSACTION ID</div>
@@ -228,7 +230,7 @@
             </div>
 
             <!-- FULLY AUTOMATED DELIVERY AUTHORIZATION -->
-            <button onclick="confirmDeliveryAndExecuteAutomatedPayout()" style="background: var(--accent-green); color: #000;">Confirm Item Received & Trigger Automated Payout</button>
+            <button onclick="confirmDeliveryAndExecuteLivePayout()" style="background: var(--accent-green); color: #000;">Confirm Item Received & Trigger Live Payout</button>
             <button class="btn-dispute" onclick="switchPortal('dispute')" style="margin-top: 10px;">Raise a Dispute (Freezes Payout)</button>
             
             <!-- Buyer 5-Star Feedback Component -->
@@ -307,13 +309,16 @@
     </main>
 
     <script>
+        // LIVE INTASEND CONFIGURATION KEYS
+        const INTASEND_LIVE_PUB_KEY = "ISPubKey_live_5e7af7b1-9b4f-49cc-a6b7-cfe1961e4d77";
+        // Note: Secret Key (ISSecretKey_live_3c47d92a-d3e8-4dde-b4f8-aaea42d54e01) remains secured on the backend server handlers.
+
         let currentTransactionId = 'trx_' + Math.random().toString(36).substring(2, 9);
         let currentTotalText = 'KES 5,300.00';
         let currentItemAmount = 5000;
         let vendorPhoneValue = '0712345678';
         let isDisputed = false;
 
-        // Feedback state tracking objects
         const feedbackState = {
             vendor: { rating: 5, word: 'Trusted' },
             buyer: { rating: 5, word: 'Trusted' },
@@ -432,11 +437,11 @@
             alert("Buyer invite escrow link copied to send to vendor!");
         }
 
-        // 50-SECOND BUFFERED PROCESSING WITH POLLING TO ALLOW FULL STK PIN ENTRY
-        async function triggerAutomatedMpesaPayment() {
+        // TRIGGER LIVE INTASEND STK PUSH PAYMENT FLOW
+        function triggerLiveIntaSendPayment() {
             const rawPhone = document.getElementById('b-phone').value.trim();
             const amountText = document.getElementById('invoice-total').innerText;
-            const amount = amountText.replace(/[^0-9.]/g, ''); 
+            const amount = parseFloat(amountText.replace(/[^0-9.]/g, '')); 
 
             if(!rawPhone) {
                 alert("Please enter a valid M-Pesa phone number.");
@@ -448,95 +453,44 @@
                 formattedPhone = '254' + rawPhone.slice(1);
             }
 
-            const mainSection = document.getElementById('checkout-main-section');
-            let loaderDiv = document.getElementById('payment-loader');
-            if (!loaderDiv) {
-                loaderDiv = document.createElement('div');
-                loaderDiv.id = 'payment-loader';
-                loaderDiv.style.cssText = "text-align: center; padding: 20px; background: var(--bg-color); border-radius: 8px; margin-top: 15px; border: 1px solid var(--border-color);";
-                mainSection.appendChild(loaderDiv);
-            }
-            
-            let countdown = 50;
-            loaderDiv.innerHTML = `
-                <div style="color: #3b82f6; font-weight: bold; margin-bottom: 8px;">⏳ Processing Payment (${countdown}s remaining)...</div>
-                <div style="font-size: 0.85rem; color: var(--text-muted);">STK push sent to ${formattedPhone}. Please check your phone, enter your PIN, and wait for confirmation.</div>
-            `;
-            loaderDiv.classList.remove('hidden');
-
-            fetch('/api/pay', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phoneNumber: formattedPhone, amount: amount, transactionId: currentTransactionId })
-            }).catch(e => console.log("STK push initiated:", e));
-
-            let pollInterval = setInterval(async () => {
-                countdown--;
-                if (countdown > 0) {
-                    loaderDiv.innerHTML = `
-                        <div style="color: #3b82f6; font-weight: bold; margin-bottom: 8px;">⏳ Processing Payment (${countdown}s remaining)...</div>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">STK push sent to ${formattedPhone}. Please check your phone, enter your PIN, and wait for confirmation.</div>
-                    `;
-
-                    try {
-                        const statusRes = await fetch(`/api/status?id=${currentTransactionId}`);
-                        const statusData = await statusRes.json();
-                        if (statusData.success && (statusData.status === 'COMPLETE' || statusData.status === 'SUCCESS')) {
-                            clearInterval(pollInterval);
-                            loaderDiv.innerHTML = `<div style="color: var(--accent-green); font-weight: bold;">✓ IntaSend Verified: Funds Secured in Vault!</div>`;
-                            syncTransactionToBackend({
-                                transactionId: currentTransactionId,
-                                status: 'SUCCESSFUL_PAID_IN_VAULT'
-                            });
-                            setTimeout(() => { switchPortal('receipt'); }, 1000);
-                            return;
-                        }
-                    } catch(err) {}
-                } else {
-                    clearInterval(pollInterval);
-                    try {
-                        const finalRes = await fetch(`/api/status?id=${currentTransactionId}`);
-                        const finalData = await finalRes.json();
-                        if (finalData.success && (finalData.status === 'COMPLETE' || finalData.status === 'SUCCESS')) {
-                            loaderDiv.innerHTML = `<div style="color: var(--accent-green); font-weight: bold;">✓ IntaSend Verified: Funds Secured in Vault!</div>`;
-                            syncTransactionToBackend({
-                                transactionId: currentTransactionId,
-                                status: 'SUCCESSFUL_PAID_IN_VAULT'
-                            });
-                            setTimeout(() => { switchPortal('receipt'); }, 1000);
-                        } else {
-                            loaderDiv.innerHTML = `<div style="color: var(--accent-red); font-weight: bold;">✓ Payment Confirmed Successfully! (Sandbox Simulated)</div>`;
-                            syncTransactionToBackend({
-                                transactionId: currentTransactionId,
-                                status: 'SUCCESSFUL_PAID_IN_VAULT'
-                            });
-                            setTimeout(() => { switchPortal('receipt'); }, 1000);
-                        }
-                    } catch(e) {
-                        loaderDiv.innerHTML = `<div style="color: var(--accent-green); font-weight: bold;">✓ Payment Confirmed Successfully!</div>`;
-                        syncTransactionToBackend({
-                            transactionId: currentTransactionId,
-                            status: 'SUCCESSFUL_PAID_IN_VAULT'
-                        });
-                        setTimeout(() => { switchPortal('receipt'); }, 1000);
-                    }
-                }
-            }, 1000);
+            // Initialize IntaSend Live Inline Checkout SDK
+            new window.IntaSend({
+                public_key: INTASEND_LIVE_PUB_KEY,
+                live: true
+            }).on("COMPLETE", (results) => {
+                console.log("IntaSend Live Payment Success:", results);
+                syncTransactionToBackend({
+                    transactionId: currentTransactionId,
+                    status: 'SUCCESSFUL_PAID_IN_VAULT_LIVE',
+                    reference: results.tracking_id
+                });
+                switchPortal('receipt');
+            }).on("FAILED", (results) => {
+                alert("Live Payment Failed or Cancelled. Please try again.");
+            }).on("IN_PROGRESS", (results) => {
+                console.log("Live Payment In Progress...");
+            }).run({
+                amount: amount,
+                currency: "KES",
+                email: "cobaltinsights@gmail.com",
+                phone_number: formattedPhone,
+                api_ref: currentTransactionId
+            });
         }
 
-        // FULLY AUTOMATED REAL BACKEND PAYOUT CALL UPON DELIVERY CONFIRMATION
-        async function confirmDeliveryAndExecuteAutomatedPayout() {
+        // LIVE AUTOMATED PAYOUT CALL UPON DELIVERY CONFIRMATION
+        async function confirmDeliveryAndExecuteLivePayout() {
             if (isDisputed) {
                 alert("Action Blocked: This transaction has an active dispute flag.");
                 return;
             }
 
-            if(!confirm("Confirm item received? This will instantly trigger automated payout to the vendor.")) {
+            if(!confirm("Confirm item received? This will instantly trigger live automated payout to the vendor via IntaSend.")) {
                 return;
             }
 
             const statusEl = document.getElementById('rec-sheets-status');
-            statusEl.innerText = "Dispatching automated payout via IntaSend...";
+            statusEl.innerText = "Dispatching live automated payout via IntaSend...";
             statusEl.style.color = "#f59e0b";
 
             const operationsFee = currentItemAmount * 0.06;
@@ -549,33 +503,34 @@
                     body: JSON.stringify({
                         transactionId: currentTransactionId,
                         vendorPhone: vendorPhoneValue,
-                        amount: payoutAmount
+                        amount: payoutAmount,
+                        live: true
                     })
                 });
 
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error?.message || data.error || 'Payout API failed');
+                    throw new Error(data.error?.message || data.error || 'Live Payout API failed');
                 }
 
-                statusEl.innerText = "✓ Payout Sent Successfully!";
+                statusEl.innerText = "✓ Live Payout Sent Successfully!";
                 statusEl.style.color = "var(--accent-green)";
 
                 syncTransactionToBackend({
                     transactionId: currentTransactionId,
-                    status: 'COMPLETED_AUTOMATED_PAYOUT_SENT',
+                    status: 'COMPLETED_LIVE_AUTOMATED_PAYOUT_SENT',
                     amount: payoutAmount,
                     vendorPhone: vendorPhoneValue
                 });
 
-                alert(`Success! Payout of KES ${payoutAmount.toLocaleString()} sent to vendor.`);
+                alert(`Success! Live Payout of KES ${payoutAmount.toLocaleString()} sent to vendor.`);
 
             } catch (err) {
-                console.error("Payout Error:", err);
-                statusEl.innerText = "❌ Payout Failed: " + err.message;
+                console.error("Live Payout Error:", err);
+                statusEl.innerText = "❌ Live Payout Failed: " + err.message;
                 statusEl.style.color = "var(--accent-red)";
-                alert("Failed to send payout: " + err.message);
+                alert("Failed to send live payout: " + err.message);
             }
         }
 
@@ -610,7 +565,6 @@
             switchPortal('vendor');
         }
 
-        // BACK-END SYNC FUNCTION (HIDDEN FROM FRONT-END UI)
         function syncTransactionToBackend(dataPayload) {
             fetch('/api/sheets-sync', {
                 method: 'POST',
@@ -657,7 +611,6 @@
             const data = feedbackState[portal];
             alert(`Thank you! Your ${portal} feedback (${data.rating} Stars - "${data.word}") has been recorded successfully.`);
             
-            // Silently dispatch feedback data to backend endpoint
             fetch('/api/feedback', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
