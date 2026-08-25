@@ -436,7 +436,7 @@
             alert("Buyer invite escrow link copied to send to vendor!");
         }
 
-        // TRIGGER LIVE INTASEND STK PUSH PAYMENT FLOW (MOBILE FIXED SDK HANDLER)
+        // FULLY RESILIENT LIVE INTASEND PAYMENT HANDLER WITH REDIRECT FALLBACK
         function triggerLiveIntaSendPayment() {
             const rawPhone = document.getElementById('b-phone').value.trim();
             const amountText = document.getElementById('invoice-total').innerText;
@@ -452,13 +452,19 @@
                 formattedPhone = '254' + rawPhone.slice(1);
             }
 
+            // Check if IntaSend SDK loaded correctly
+            if (typeof window.IntaSend === 'undefined') {
+                alert("Payment gateway script blocked or loading. Redirecting securely to IntaSend live payment portal...");
+                window.location.href = `https://payment.intasend.com/pay/?public_key=${INTASEND_LIVE_PUB_KEY}&amount=${amount}&currency=KES&api_ref=${currentTransactionId}&phone_number=${formattedPhone}`;
+                return;
+            }
+
             try {
-                let intasendPayment = new window.IntaSend({
+                // Initialize using IntaSend standard inline checkout parameters
+                new window.IntaSend({
                     public_key: INTASEND_LIVE_PUB_KEY,
                     live: true
-                });
-
-                intasendPayment.on("COMPLETE", (results) => {
+                }).on("COMPLETE", (results) => {
                     console.log("IntaSend Live Payment Success:", results);
                     syncTransactionToBackend({
                         transactionId: currentTransactionId,
@@ -470,9 +476,7 @@
                     alert("Live Payment Failed or Cancelled. Please try again.");
                 }).on("IN_PROGRESS", (results) => {
                     console.log("Live Payment In Progress...");
-                });
-
-                intasendPayment.run({
+                }).run({
                     amount: amount,
                     currency: "KES",
                     email: "cobaltinsights@gmail.com",
@@ -482,7 +486,8 @@
 
             } catch (error) {
                 console.error("IntaSend Init Error:", error);
-                alert("Could not initialize payment gateway. Please check your connection.");
+                // Fallback direct URL redirect if popup/inline is blocked by mobile browser restrictions
+                window.location.href = `https://payment.intasend.com/pay/?public_key=${INTASEND_LIVE_PUB_KEY}&amount=${amount}&currency=KES&api_ref=${currentTransactionId}&phone_number=${formattedPhone}`;
             }
         }
 
