@@ -12,15 +12,24 @@ export default async function handler(req, res) {
         }
 
         const intasendSecret = process.env.INTASEND_SECRET_KEY;
-        const intasendPubKey = process.env.INTASEND_PUBLIC_KEY;
+        const isTestMode = !intasendSecret || intasendSecret.includes('test') || process.env.NODE_ENV !== 'production';
+        const intasendBaseUrl = 'https://sandbox.intasend.com/api/v1'; // Change to live URL if using live keys: https://payment.intasend.com/api/v1
 
         let payoutStatus = 'PENDING';
-        let intasendResponseData = null;
+        let intasendErrorMsg = null;
 
-        // 1. Execute Real IntaSend B2C Payout API Call
-        if (intasendSecret && !intasendSecret.includes('sandbox_placeholder')) {
-            const isTestMode = intasendSecret.includes('test') || (intasendPubKey && intasendPubKey.includes('test'));
-            const intasendBaseUrl = isTestMode ? 'https://sandbox.intasend.com/api/v1' : 'https://payment.intasend.com/api/v1';
+        if (intasendSecret) {
+            const payoutPayload = {
+                currency: 'KES',
+                transactions: [
+                    {
+                        name: 'Vendor Escrow Payout',
+                        account: phone,
+                        amount: parseFloat(amount),
+                        narrative: `Amanapay Payout ${transactionId}`
+                    }
+                ]
+            };
 
             const intasendRes = await fetch(`${intasendBaseUrl}/payouts/m-pesa/`, {
                 method: 'POST',
@@ -28,61 +37,52 @@ export default async function handler(req, res) {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${intasendSecret}`
                 },
-                body: JSON.stringify({
-                    provider: 'MPESA',
-                    currency: 'KES',
-                    transactions: [
-                        {
-                            name: 'Vendor Escrow Payout',
-                            account: phone,
-                            amount: amount,
-                            narrative: `Amanapay Payout ${transactionId}`
-                        }
-                    ]
-                })
+                body: JSON.stringify(payoutPayload)
             });
 
-            intasendResponseData = await intasendRes.json();
+            const intasendData = await intasendRes.json();
 
             if (!intasendRes.ok) {
                 payoutStatus = 'FAILED';
-                throw new Error(intasendResponseData.message || 'IntaSend Payout API rejection');
+                intasendErrorMsg = JSON.stringify(intasendData);
+                console.error("IntaSend Payout Rejection:", intasendErrorMsg);
             } else {
                 payoutStatus = 'SUCCESSFUL';
             }
         } else {
-            // Fallback if keys are not yet fully configured in Vercel
-            payoutStatus = 'SUCCESSFUL_SIMULATED';
+            payoutStatus = 'FAILED_NO_SECRET';
+            intasendErrorMsg = 'Missing INTASEND_SECRET_KEY environment variable';
         }
 
-        // 2. Send structured column statuses to Google Apps Script CRM
-        try {
-            await fetch('https://script.google.com/macros/s/AKfycbypUtJBHD_8FTVP03n_LDHNai8AeLqG9_q6kMM4sMzPJ6iCVmc2aHNXuZ2BnDhkdRlTSw/exec', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    api_ref: transactionId,
-                    phone_number: phone,
-                    amount: amount,
-                    buyer_status: 'SUCCESSFUL',
-                    vendor_payout_status: payoutStatus,
-                    timestamp: new Date().toISOString()
-                })
+        // Sync dual status to Google Sheet via Apps Script
+        await fetch('https://script.google.com/macros/s/AKfycbypUtJBHD_8FTVP03n_LDHNai8AeLqG9_q6kMM4sMzPJ6iCVmc2aHNXuZ2BnDhkdRlTSw/exec', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                api_ref: transactionId,
+                phone_number: phone,
+                amount: amount,
+                buyer_status: 'SUCCESSFUL',
+                vendor_payout_status: payoutStatus
+            })
+        });
+
+        if (payoutStatus === 'FAILED') {
+            return res.status(400).json({ 
+                success: false, 
+                error: `IntaSend rejected payout: ${intasendErrorMsg}` 
             });
-        } catch (sheetErr) {
-            console.log("Google Apps Script Sync Warning:", sheetErr.message);
         }
 
         return res.status(200).json({
             success: true,
-            message: 'Payout processed and synced successfully',
-            intasend: intasendResponseData,
+            message: 'Payout processed successfully',
             transactionId,
             amount
         });
 
     } catch (error) {
-        console.error('Payout API Error:', error);
+        console.error('Payout API Critical Error:', error);
         return res.status(500).json({ success: false, error: error.message });
     }
 }
