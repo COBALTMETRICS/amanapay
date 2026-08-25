@@ -434,7 +434,7 @@
             alert("Buyer invite escrow link copied to send to vendor!");
         }
 
-        // RELIABLE LIVE INTASEND CHECKOUT REDIRECT (BYPASSES SCRIPT-BLOCKING)
+        // DYNAMIC INTASEND SCRIPT LOADER & SDK EXECUTOR
         function triggerLiveIntaSendPayment() {
             const rawPhone = document.getElementById('b-phone').value.trim();
             const amountText = document.getElementById('invoice-total').innerText;
@@ -450,17 +450,52 @@
                 formattedPhone = '254' + rawPhone.slice(1);
             }
 
-            syncTransactionToBackend({
-                transactionId: currentTransactionId,
-                status: 'REDIRECTED_TO_INTASEND_LIVE',
-                amount: amount,
-                phone: formattedPhone
-            });
+            if (typeof window.IntaSend === 'undefined') {
+                const script = document.createElement('script');
+                script.src = "https://unpkg.com/@intasend/intasend-inlinejs-sdk@3.0.4/build/intasend-inline.js";
+                script.onload = () => executeIntaSendCheckout(amount, formattedPhone);
+                script.onerror = () => {
+                    alert("Could not load IntaSend script. Please check your network connection.");
+                };
+                document.head.appendChild(script);
+            } else {
+                executeIntaSendCheckout(amount, formattedPhone);
+            }
+        }
 
-            // Official IntaSend Checkout URL redirect
-            const intaSendLiveCheckoutURL = `https://payment.intasend.com/pay/?public_key=${INTASEND_LIVE_PUB_KEY}&amount=${amount}&currency=KES&api_ref=${currentTransactionId}&phone_number=${formattedPhone}&email=cobaltinsights@gmail.com`;
-            
-            window.location.href = intaSendLiveCheckoutURL;
+        function executeIntaSendCheckout(amount, formattedPhone) {
+            try {
+                window.intaSendPay = new window.IntaSend({
+                    public_key: INTASEND_LIVE_PUB_KEY,
+                    live: true
+                });
+
+                window.intaSendPay.on("COMPLETE", (results) => {
+                    console.log("Payment Success:", results);
+                    syncTransactionToBackend({
+                        transactionId: currentTransactionId,
+                        status: 'SUCCESSFUL_PAID_IN_VAULT_LIVE',
+                        reference: results.tracking_id
+                    });
+                    switchPortal('receipt');
+                }).on("FAILED", (results) => {
+                    alert("Payment failed or was cancelled.");
+                }).on("IN_PROGRESS", (results) => {
+                    console.log("STK Push sent to phone...");
+                });
+
+                window.intaSendPay.run({
+                    amount: amount,
+                    currency: "KES",
+                    email: "cobaltinsights@gmail.com",
+                    phone_number: formattedPhone,
+                    api_ref: currentTransactionId
+                });
+
+            } catch (error) {
+                console.error("IntaSend Init Error:", error);
+                alert("Payment initialization error: " + error.message);
+            }
         }
 
         // LIVE AUTOMATED PAYOUT CALL UPON DELIVERY CONFIRMATION
