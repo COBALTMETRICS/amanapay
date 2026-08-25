@@ -17,19 +17,49 @@ export default async function handler(req, res) {
         });
 
         const sheets = google.sheets({ version: 'v4', auth });
-        const spreadsheetId = '13lgsQViq8GQr6K5z0LJ-A5nFxmmXpWCaJA59N5q_ns'; // From your Sheet URL
+        const spreadsheetId = '13lgsQViq8GQr6K5z0LJ-A5nFxmmXpWCaJA59N5q_ns';
 
-        // Append or update row logic here
-        await sheets.spreadsheets.values.append({
+        // Read existing rows to see if transaction already exists, or append/update
+        const response = await sheets.spreadsheets.values.get({
             spreadsheetId,
-            range: 'Sheet1!A:F',
-            valueInputOption: 'USER_ENTERED',
-            requestBody: {
-                values: [[new Date().toISOString(), transactionId, vendorPhone || '', amount || '', status]]
-            }
+            range: 'Sheet1!A:E',
         });
 
-        return res.status(200).json({ success: true, message: 'Sheet synced successfully' });
+        const rows = response.data.values;
+        let rowIndex = -1;
+
+        if (rows) {
+            for (let i = 0; i < rows.length; i++) {
+                if (rows[i][1] === transactionId) {
+                    rowIndex = i + 1; // 1-indexed for Google Sheets
+                    break;
+                }
+            }
+        }
+
+        if (rowIndex > -1) {
+            // Update existing row status column (Column E)
+            await sheets.spreadsheets.values.update({
+                spreadsheetId,
+                range: `Sheet1!E${rowIndex}`,
+                valueInputOption: 'USER_ENTERED',
+                requestBody: {
+                    values: [[status]]
+                }
+            });
+        } else {
+            // Append new row if not found
+            await sheets.spreadsheets.values.append({
+                spreadsheetId,
+                range: 'Sheet1!A:E',
+                valueInputOption: 'USER_ENTERED',
+                requestBody: {
+                    values: [[new Date().toLocaleString(), transactionId, vendorPhone || '', amount || '', status]]
+                }
+            });
+        }
+
+        return res.status(200).json({ success: true, message: 'Google Sheet synced successfully' });
     } catch (error) {
         console.error('Sheets Sync Error:', error);
         return res.status(500).json({ success: false, error: error.message });
