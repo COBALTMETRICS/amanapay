@@ -1,63 +1,44 @@
 export default async function handler(req, res) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-
     if (req.method !== 'POST') {
-        return res.status(405).json({ success: false, error: 'Method not allowed' });
+        return res.status(405).json({ success: false, message: 'Method not allowed' });
     }
 
-    const { phoneNumber, amount } = req.body;
-    const apiRef = "trx_" + Math.random().toString(36).substring(2, 8);
+    const { phoneNumber, amount, transactionId } = req.body;
+
+    if (!phoneNumber || !amount) {
+        return res.status(400).json({ success: false, message: 'Missing phone number or amount' });
+    }
+
+    const apiRef = transactionId || "trx_" + Math.random().toString(36).substring(2, 8);
+    const isSandbox = process.env.INTASEND_SANDBOX !== 'false';
+    const baseUrl = isSandbox 
+        ? 'https://sandbox.intasend.com/api/v1' 
+        : 'https://payment.intasend.com/api/v1';
 
     try {
-        // 1. Trigger IntaSend M-Pesa STK Push Sandbox Request
-        const intasendResponse = await fetch('https://sandbox.intasend.com/api/v1/payment/mpesa-stk-push/', {
+        const intasendResponse = await fetch(`${baseUrl}/payment/mpesa-stk-push/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${process.env.INTASEND_SECRET_KEY}`
             },
             body: JSON.stringify({
+                public_key: process.env.INTASEND_PUBLIC_KEY,
                 amount: Number(amount),
                 phone_number: phoneNumber,
-                email: "buyer@amanapay.co",
-                first_name: "Amanapay",
-                last_name: "Buyer",
-                api_ref: apiRef
+                api_ref: apiRef,
+                email: "buyer@amanapay.co"
             })
         });
 
         const data = await intasendResponse.json();
 
         if (!intasendResponse.ok) {
-            throw new Error(JSON.stringify(data));
+            return res.status(intasendResponse.status).json({ success: false, error: data });
         }
 
-        // 2. Automatically log the successful transaction to your Google Sheet CRM
-        try {
-            await fetch('https://script.google.com/macros/s/AKfycbypUtJBHD_8FTVP03n_LDHNai8AeLqG9_q6kMM4sMzPJ6iCVmc2aHNXuZ2BnDhkdRlTSw/exec', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    api_ref: apiRef,
-                    phone_number: phoneNumber,
-                    amount: amount,
-                    status: "SUCCESS"
-                })
-            });
-        } catch (sheetError) {
-            console.error("Google Sheet Logging Error:", sheetError);
-            // Non-blocking error so the payment flow still succeeds even if logging fails
-        }
-
-        return res.status(200).json({ success: true, response: data });
+        return res.status(200).json({ success: true, data });
     } catch (error) {
-        console.error("IntaSend API Error:", error);
-        return res.status(500).json({ success: false, error: error.message || 'Payment failed' });
+        return res.status(500).json({ success: false, error: error.message });
     }
 }
