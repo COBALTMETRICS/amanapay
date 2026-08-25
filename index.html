@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amanapay - Secure Social Commerce Escrow</title>
+    <!-- Pre-load IntaSend SDK directly in the head to avoid runtime loading blocks -->
+    <script src="https://unpkg.com/@intasend/intasend-inlinejs-sdk@3.0.4/build/intasend-inline.js"></script>
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -434,7 +436,7 @@
             alert("Buyer invite escrow link copied to send to vendor!");
         }
 
-        // DYNAMIC INTASEND SCRIPT LOADER & SDK EXECUTOR
+        // PRE-LOADED SDK INTASEND EXECUTION HANDLER
         function triggerLiveIntaSendPayment() {
             const rawPhone = document.getElementById('b-phone').value.trim();
             const amountText = document.getElementById('invoice-total').innerText;
@@ -451,19 +453,10 @@
             }
 
             if (typeof window.IntaSend === 'undefined') {
-                const script = document.createElement('script');
-                script.src = "https://unpkg.com/@intasend/intasend-inlinejs-sdk@3.0.4/build/intasend-inline.js";
-                script.onload = () => executeIntaSendCheckout(amount, formattedPhone);
-                script.onerror = () => {
-                    alert("Could not load IntaSend script. Please check your network connection.");
-                };
-                document.head.appendChild(script);
-            } else {
-                executeIntaSendCheckout(amount, formattedPhone);
+                alert("IntaSend SDK is still loading or blocked. Please refresh the page.");
+                return;
             }
-        }
 
-        function executeIntaSendCheckout(amount, formattedPhone) {
             try {
                 window.intaSendPay = new window.IntaSend({
                     public_key: INTASEND_LIVE_PUB_KEY,
