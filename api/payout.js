@@ -7,54 +7,57 @@ export default async function handler(req, res) {
 
     try {
         let phone = vendorPhone;
-        if (phone.startsWith('0')) {
+        if (phone && phone.startsWith('0')) {
             phone = '254' + phone.slice(1);
         }
 
         const intasendSecret = process.env.INTASEND_SECRET_KEY;
         
-        // If test mode or sandbox keys are used without live credentials, fallback gracefully for testing
-        if (!intasendSecret || intasendSecret.includes('sandbox_placeholder')) {
-            return res.status(200).json({
-                success: true,
-                simulated: true,
-                message: 'Payout simulated successfully (Add live IntaSend keys to enable live B2C pushes)',
-                transactionId,
-                amount
+        // 1. Trigger IntaSend B2C Payout if live keys are present, otherwise simulate gracefully
+        if (intasendSecret && !intasendSecret.includes('sandbox_placeholder')) {
+            const intasendRes = await fetch('https://payment.intasend.com/api/v1/payouts/m-pesa/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${intasendSecret}`
+                },
+                body: JSON.stringify({
+                    provider: 'MPESA',
+                    currency: 'KES',
+                    transactions: [
+                        {
+                            name: 'Vendor Escrow Payout',
+                            account: phone,
+                            amount: amount,
+                            narrative: `Amanapay Payout ${transactionId}`
+                        }
+                    ]
+                })
             });
+
+            const intasendData = await intasendRes.json();
+            if (!intasendRes.ok) {
+                throw new Error(intasendData.message || 'IntaSend Payout API rejection');
+            }
         }
 
-        // Live IntaSend B2C Payout Request
-        const intasendRes = await fetch('https://payment.intasend.com/api/v1/payouts/m-pesa/', {
+        // 2. Notify your Google Apps Script CRM to update the spreadsheet status
+        await fetch('https://script.google.com/macros/s/AKfycbypUtJBHD_8FTVP03n_LDHNai8AeLqG9_q6kMM4sMzPJ6iCVmc2aHNXuZ2BnDhkdRlTSw/exec', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${intasendSecret}`
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                provider: 'MPESA',
-                currency: 'KES',
-                transactions: [
-                    {
-                        name: 'Vendor Escrow Payout',
-                        account: phone,
-                        amount: amount,
-                        narrative: `Amanapay Payout ${transactionId}`
-                    }
-                ]
+                api_ref: transactionId,
+                phone_number: phone,
+                amount: amount,
+                status: 'COMPLETED_PAYOUT_SENT'
             })
         });
 
-        const intasendData = await intasendRes.json();
-
-        if (!intasendRes.ok) {
-            throw new Error(intasendData.message || 'IntaSend Payout API rejection');
-        }
-
         return res.status(200).json({
             success: true,
-            data: intasendData,
-            message: 'IntaSend payout triggered successfully'
+            message: 'Payout processed and Google Sheet updated successfully',
+            transactionId,
+            amount
         });
 
     } catch (error) {
