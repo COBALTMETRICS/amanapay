@@ -6,6 +6,7 @@
     <title>Amanapay - Secure Social Commerce Escrow</title>
     <!-- Preload hint -->
     <link rel="preconnect" href="https://unpkg.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -304,7 +305,7 @@
         </div>
     </main>
 
-    <!-- Self-healing script injection loader -->
+    <!-- Self-healing script injection loader with dual CDN fallback -->
     <script>
         // LIVE INTASEND CONFIGURATION KEYS
         const INTASEND_LIVE_PUB_KEY = "ISPubKey_live_5e7af7b1-9b4f-49cc-a6b7-cfe1961e4d77";
@@ -321,25 +322,38 @@
             support: { rating: 5, word: 'Trusted' }
         };
 
-        // Dynamically load SDK if missing
+        // Self-healing script loader with primary and fallback CDN
         function ensureIntaSendLoaded(callback) {
             if (typeof window.IntaSend !== 'undefined') {
                 callback();
                 return;
             }
-            const existingScript = document.getElementById('intasend-sdk');
-            if (existingScript) {
-                existingScript.onload = callback;
+            
+            if (document.getElementById('intasend-sdk')) {
+                document.getElementById('intasend-sdk').onload = callback;
                 return;
             }
+
             const script = document.createElement('script');
             script.id = 'intasend-sdk';
             script.src = "https://unpkg.com/@intasend/intasend-inlinejs-sdk@3.0.4/build/intasend-inline.js";
             script.async = true;
+            
             script.onload = callback;
+            
             script.onerror = function() {
-                alert("Could not load IntaSend SDK script. Please check your network connection.");
+                console.warn("Primary CDN failed, switching to fallback CDN (jsDelivr)...");
+                const fallbackScript = document.createElement('script');
+                fallbackScript.id = 'intasend-sdk-fallback';
+                fallbackScript.src = "https://cdn.jsdelivr.net/npm/@intasend/intasend-inlinejs-sdk@3.0.4/build/intasend-inline.js";
+                fallbackScript.async = true;
+                fallbackScript.onload = callback;
+                fallbackScript.onerror = function() {
+                    alert("Could not load IntaSend SDK from any CDN. Please check your network connection or firewall settings.");
+                };
+                document.head.appendChild(fallbackScript);
             };
+            
             document.head.appendChild(script);
         }
 
@@ -459,7 +473,6 @@
             alert("Buyer invite escrow link copied to send to vendor!");
         }
 
-        // SELF-HEALING INTASEND EXECUTION HANDLER
         function triggerLiveIntaSendPayment() {
             const rawPhone = document.getElementById('b-phone').value.trim();
             const amountText = document.getElementById('invoice-total').innerText;
