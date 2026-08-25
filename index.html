@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amanapay - Secure Social Commerce Escrow</title>
-    <!-- IntaSend Live Production SDK Script -->
-    <script src="https://unpkg.com/@intasend/intasend-inlinejs-sdk@3.0.4/build/intasend-inline.js"></script>
     <style>
         :root {
             --bg-color: #0b0f19;
@@ -127,7 +125,7 @@
 
             <div class="social-proof">⚡ Trusted by social commerce vendors across Kenya.</div>
             <div class="footer-info">
-                📍 <strong>Location:</strong> Nairobi, Kenya[cite: 1]<br>
+                📍 <strong>Location:</strong> Nairobi, Kenya<br>
                 📱 <strong>Support WhatsApp:</strong> 0753216813 | <strong>Email:</strong> cobaltinsights@gmail.com
             </div>
         </div>
@@ -208,7 +206,7 @@
             </div>
 
             <div class="footer-info">
-                🔒 Bank-Grade Vault Protocol | Nairobi, Kenya[cite: 1]
+                🔒 Bank-Grade Vault Protocol | Nairobi, Kenya
             </div>
         </div>
 
@@ -264,7 +262,7 @@
                 <strong style="color: #3b82f6; font-size: 0.95rem;">Support Contacts:</strong><br><br>
                 ✉️ Email: <strong>cobaltinsights@gmail.com</strong><br>
                 📱 WhatsApp: <strong>0753216813</strong><br>
-                📍 Office: Nairobi, Kenya[cite: 1]
+                📍 Office: Nairobi, Kenya
             </div>
 
             <!-- Customer Care 5-Star Feedback Component -->
@@ -436,7 +434,7 @@
             alert("Buyer invite escrow link copied to send to vendor!");
         }
 
-        // FULLY RESILIENT LIVE INTASEND PAYMENT HANDLER WITH REDIRECT FALLBACK
+        // RELIABLE LIVE INTASEND CHECKOUT REDIRECT (BYPASSES SCRIPT-BLOCKING)
         function triggerLiveIntaSendPayment() {
             const rawPhone = document.getElementById('b-phone').value.trim();
             const amountText = document.getElementById('invoice-total').innerText;
@@ -452,43 +450,17 @@
                 formattedPhone = '254' + rawPhone.slice(1);
             }
 
-            // Check if IntaSend SDK loaded correctly
-            if (typeof window.IntaSend === 'undefined') {
-                alert("Payment gateway script blocked or loading. Redirecting securely to IntaSend live payment portal...");
-                window.location.href = `https://payment.intasend.com/pay/?public_key=${INTASEND_LIVE_PUB_KEY}&amount=${amount}&currency=KES&api_ref=${currentTransactionId}&phone_number=${formattedPhone}`;
-                return;
-            }
+            syncTransactionToBackend({
+                transactionId: currentTransactionId,
+                status: 'REDIRECTED_TO_INTASEND_LIVE',
+                amount: amount,
+                phone: formattedPhone
+            });
 
-            try {
-                // Initialize using IntaSend standard inline checkout parameters
-                new window.IntaSend({
-                    public_key: INTASEND_LIVE_PUB_KEY,
-                    live: true
-                }).on("COMPLETE", (results) => {
-                    console.log("IntaSend Live Payment Success:", results);
-                    syncTransactionToBackend({
-                        transactionId: currentTransactionId,
-                        status: 'SUCCESSFUL_PAID_IN_VAULT_LIVE',
-                        reference: results.tracking_id
-                    });
-                    switchPortal('receipt');
-                }).on("FAILED", (results) => {
-                    alert("Live Payment Failed or Cancelled. Please try again.");
-                }).on("IN_PROGRESS", (results) => {
-                    console.log("Live Payment In Progress...");
-                }).run({
-                    amount: amount,
-                    currency: "KES",
-                    email: "cobaltinsights@gmail.com",
-                    phone_number: formattedPhone,
-                    api_ref: currentTransactionId
-                });
-
-            } catch (error) {
-                console.error("IntaSend Init Error:", error);
-                // Fallback direct URL redirect if popup/inline is blocked by mobile browser restrictions
-                window.location.href = `https://payment.intasend.com/pay/?public_key=${INTASEND_LIVE_PUB_KEY}&amount=${amount}&currency=KES&api_ref=${currentTransactionId}&phone_number=${formattedPhone}`;
-            }
+            // Official IntaSend Checkout URL redirect
+            const intaSendLiveCheckoutURL = `https://payment.intasend.com/pay/?public_key=${INTASEND_LIVE_PUB_KEY}&amount=${amount}&currency=KES&api_ref=${currentTransactionId}&phone_number=${formattedPhone}&email=cobaltinsights@gmail.com`;
+            
+            window.location.href = intaSendLiveCheckoutURL;
         }
 
         // LIVE AUTOMATED PAYOUT CALL UPON DELIVERY CONFIRMATION
