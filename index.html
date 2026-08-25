@@ -239,7 +239,7 @@
             </div>
 
             <button class="btn-dispute" onclick="sendDisputeEmail()">Send Issue to cobaltinsights@gmail.com</button>
-            <button style="background: transparent; color: var(--text-muted); border: 1px solid var(--border-color);" onclick="switchPortal('faq')":>Back to Customer Care</button>
+            <button style="background: transparent; color: var(--text-muted); border: 1px solid var(--border-color);" onclick="switchPortal('faq')">Back to Customer Care</button>
         </div>
     </main>
 
@@ -464,10 +464,10 @@
             }, 1000);
         }
 
-        // FULLY AUTOMATED PAYOUT UPON DELIVERY CONFIRMATION
+        // FULLY AUTOMATED REAL BACKEND PAYOUT CALL UPON DELIVERY CONFIRMATION
         async function confirmDeliveryAndExecuteAutomatedPayout() {
             if (isDisputed) {
-                alert("Action Blocked: This transaction has an active dispute flag. Automated payouts are programmatically frozen.");
+                alert("Action Blocked: This transaction has an active dispute flag.");
                 return;
             }
 
@@ -476,45 +476,53 @@
             }
 
             const statusEl = document.getElementById('rec-sheets-status');
-            statusEl.innerText = "Delivery confirmed! Triggering automated vendor payout...";
+            statusEl.innerText = "Dispatching automated payout via IntaSend...";
             statusEl.style.color = "#f59e0b";
 
             const operationsFee = currentItemAmount * 0.06;
             const payoutAmount = currentItemAmount - operationsFee;
 
             try {
+                // Call the backend payout endpoint `/api/payout`
                 const response = await fetch('/api/payout', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         transactionId: currentTransactionId,
                         vendorPhone: vendorPhoneValue,
-                        amount: payoutAmount,
-                        trigger: 'immediate_delivery_automated_payout'
+                        amount: payoutAmount
                     })
                 });
 
                 const data = await response.json();
-                statusEl.innerText = "✓ Automated Payout Dispatched & Google Sheet Synced!";
+
+                if (!response.ok) {
+                    throw new Error(data.error?.message || data.error || 'Payout API failed');
+                }
+
+                statusEl.innerText = "✓ Payout Sent & Google Sheet Synced Successfully!";
                 statusEl.style.color = "var(--accent-green)";
-                
+
                 syncTransactionToGoogleSheet({
                     transactionId: currentTransactionId,
-                    status: 'COMPLETED_AUTOMATED_PAYOUT_SENT'
+                    status: 'COMPLETED_AUTOMATED_PAYOUT_SENT',
+                    amount: payoutAmount,
+                    vendorPhone: vendorPhoneValue
                 });
 
-                alert(`Automated payout of KES ${payoutAmount.toLocaleString()} successfully sent to vendor (${vendorPhoneValue}) via IntaSend.`);
+                alert(`Success! Payout of KES ${payoutAmount.toLocaleString()} sent to vendor.`);
+
             } catch (err) {
-                console.log("Payout error handled:", err);
-                statusEl.innerText = "✓ Automated Payout Dispatched Successfully";
-                statusEl.style.color = "var(--accent-green)";
-                alert(`Automated payout dispatched successfully for KES ${payoutAmount.toLocaleString()} (6.0% operations retainer retained).`);
+                console.error("Payout Error:", err);
+                statusEl.innerText = "❌ Payout Failed: " + err.message;
+                statusEl.style.color = "var(--accent-red)";
+                alert("Failed to send payout: " + err.message);
             }
         }
 
         // SEND DISPUTE DIRECTLY TO EMAIL & SYNC TO GOOGLE SHEETS
         function sendDisputeEmail() {
-            const issue = document.getElementById('dispute-issue-input').value ? document.getElementById('dispute-issue-input').value.trim() : document.getElementById('dispute-issue').value.trim();
+            const issue = document.getElementById('dispute-issue').value.trim();
             const txLink = document.getElementById('dispute-tx-link').value.trim();
 
             if(!issue) {
