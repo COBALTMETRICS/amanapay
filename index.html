@@ -311,7 +311,6 @@
     <script>
         // LIVE INTASEND CONFIGURATION KEYS
         const INTASEND_LIVE_PUB_KEY = "ISPubKey_live_5e7af7b1-9b4f-49cc-a6b7-cfe1961e4d77";
-        // Note: Secret Key (ISSecretKey_live_3c47d92a-d3e8-4dde-b4f8-aaea42d54e01) remains secured on the backend server handlers.
 
         let currentTransactionId = 'trx_' + Math.random().toString(36).substring(2, 9);
         let currentTotalText = 'KES 5,300.00';
@@ -437,7 +436,7 @@
             alert("Buyer invite escrow link copied to send to vendor!");
         }
 
-        // TRIGGER LIVE INTASEND STK PUSH PAYMENT FLOW
+        // TRIGGER LIVE INTASEND STK PUSH PAYMENT FLOW (MOBILE FIXED SDK HANDLER)
         function triggerLiveIntaSendPayment() {
             const rawPhone = document.getElementById('b-phone').value.trim();
             const amountText = document.getElementById('invoice-total').innerText;
@@ -453,29 +452,38 @@
                 formattedPhone = '254' + rawPhone.slice(1);
             }
 
-            // Initialize IntaSend Live Inline Checkout SDK
-            new window.IntaSend({
-                public_key: INTASEND_LIVE_PUB_KEY,
-                live: true
-            }).on("COMPLETE", (results) => {
-                console.log("IntaSend Live Payment Success:", results);
-                syncTransactionToBackend({
-                    transactionId: currentTransactionId,
-                    status: 'SUCCESSFUL_PAID_IN_VAULT_LIVE',
-                    reference: results.tracking_id
+            try {
+                let intasendPayment = new window.IntaSend({
+                    public_key: INTASEND_LIVE_PUB_KEY,
+                    live: true
                 });
-                switchPortal('receipt');
-            }).on("FAILED", (results) => {
-                alert("Live Payment Failed or Cancelled. Please try again.");
-            }).on("IN_PROGRESS", (results) => {
-                console.log("Live Payment In Progress...");
-            }).run({
-                amount: amount,
-                currency: "KES",
-                email: "cobaltinsights@gmail.com",
-                phone_number: formattedPhone,
-                api_ref: currentTransactionId
-            });
+
+                intasendPayment.on("COMPLETE", (results) => {
+                    console.log("IntaSend Live Payment Success:", results);
+                    syncTransactionToBackend({
+                        transactionId: currentTransactionId,
+                        status: 'SUCCESSFUL_PAID_IN_VAULT_LIVE',
+                        reference: results.tracking_id
+                    });
+                    switchPortal('receipt');
+                }).on("FAILED", (results) => {
+                    alert("Live Payment Failed or Cancelled. Please try again.");
+                }).on("IN_PROGRESS", (results) => {
+                    console.log("Live Payment In Progress...");
+                });
+
+                intasendPayment.run({
+                    amount: amount,
+                    currency: "KES",
+                    email: "cobaltinsights@gmail.com",
+                    phone_number: formattedPhone,
+                    api_ref: currentTransactionId
+                });
+
+            } catch (error) {
+                console.error("IntaSend Init Error:", error);
+                alert("Could not initialize payment gateway. Please check your connection.");
+            }
         }
 
         // LIVE AUTOMATED PAYOUT CALL UPON DELIVERY CONFIRMATION
